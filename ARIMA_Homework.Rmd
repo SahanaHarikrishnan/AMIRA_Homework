@@ -1,0 +1,78 @@
+---
+title: "ARIMA Homework"
+output: html_document
+date: "2025-04-05"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+install.packages("fpp")
+install.packages("fpp2")
+install.packages("forecast")
+install.packages("tidyverse")
+```
+
+```{r}
+library(fpp)
+library(fpp2)
+library(forecast)
+library(tidyverse)
+```
+
+```{r}
+UnemploymentCanada <- read_csv("Unemployment_Canada_1976_present.csv")
+
+canada_filtered <- UnemploymentCanada %>%
+  filter(GEO == "Canada",
+         Sex == "Both sexes",
+         `Age group` == "15 years and over")
+
+canada_ts <- ts(canada_filtered$Unemployment, start=c(1976,1), frequency=12)
+
+plot(canada_ts)
+ndiffs(canada_ts)
+tsdisplay(canada_ts)
+
+
+```
+
+
+```{r}
+canada_diff1 <- diff(canada_ts, differences=1)
+plot(canada_diff1)
+tsdisplay(canada_diff1)
+
+auto_fit <- auto.arima(canada_ts, trace=TRUE, stepwise=FALSE)
+auto_fit
+attributes(auto_fit)
+
+plot(forecast(auto_fit, h=5, level=c(99.5)))
+
+Acf(auto_fit$residuals)
+Box.test(residuals(auto_fit), lag=20, type="Ljung")
+plot.ts(residuals(auto_fit))
+hist(auto_fit$residuals)
+tsdiag(auto_fit)
+
+accuracy(auto_fit)
+```
+1. According to my output, the model selected is ARIMA (0,1,4)
+
+p = 0 (Autoregressive terms): This means the model does not use past unemployment values directly to make predictions. Previous months’ unemployment levels don't add significant predictive value once the trend is removed.
+d = 1 (Differencing): The model differences the data one time to make the series stationary- this removes long-term trends/seasonality, letting the ARIMA model focus on short-term fluctuations. Additionally, this was supported by the ndiffs() function, which was 1
+q = 4 (Moving average terms): The model uses the last four forecast errors previous months shocks) to help predict future values. In other words, unexpected changes in recent months are useful in forecasting unemployment.
+ARIMA(0,1,4) means that the forecast is based on how unemployment has changed over timr(d=1), and how it has unexpectedly changed in recent months (q=4), but not on the raw values themselves (p=0).
+
+The MA coefficients represent the influence of previous unexpected changes on current unemployment value. Ex: MA(1) = 0.4522- the model places moderate weight on the most recent forecast error. Additionally, the SEs are small, meaning the estimates are likely reliable. The negative MA values show that a past forecast error or shock is having the opposite effect on the current value, and can help correct lingering impacts from past shocks. 
+
+Additionlly, these are the following model fit stats: Log-likelihood = -6923.23, AIC = 13856.31, BIC = 13877.99
+
+2. The residuals are centered around 0 and do not exhibit signs of any clear patterns. Additionally the ACF plot shows the spikes mostly staying within the bounds of insignificance, showing there is no significant autocorrelation present. The histogram and residual time plots appear to be random as well. The p value of the Ljung Box test is 0.2223 showing the residuals behave like white noise. Overall, model asumptions are being satisfied. 
+
+3. The forecast shows unemployment predictions for the next 5 months using the ARIMA(0,1,4) model. The blue line represents the point forecasts, and the shaded area shows the 99.5% confidence interval. The forecast is fairly flat which is consistent with the post-COVID downward trend post the Pandemic. 
+
+4.For the accuracy for the model, RMSE = 51794.1, MAE = 29601.74, MAPE = 2.26%
+These values are pretty low, especially the MAPE, showing that the model predicts unemployment with good accuracy. Additionally, ACF1 is approx 0, indicating that there is no autocorrelation left in the residuals.
